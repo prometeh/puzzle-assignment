@@ -4,11 +4,13 @@ import java.util.ArrayList;
 
 public class Puzzle {
     private ArrayList<ArrayList<Piece>> solutionBoard;
+    private ArrayList<Piece> usedPieces = new ArrayList<>();
     private ArrayList<Piece> pieces;
     private int width;
     private int height;
     private int totalPieces;
     private boolean solvable;
+    private int solutionsNumber;
 
     public Puzzle(String[] data) {
         this.pieces = getPieces(data);
@@ -24,29 +26,20 @@ public class Puzzle {
         for (int i = 0; i < totalPieces; ++i) {
             pieces.add(new Piece(data[i + 1]));
         }
-        
+
         return pieces;
     }
 
     public void trySolvePuzzle() {
-        ArrayList<Piece> rowResult = new ArrayList<>();
+
         for (int i = 0; i < height; i++) {
-            rowResult.clear();
-            solveArow(pieces, rowResult);
+            ArrayList<Piece> rowResult = new ArrayList<>();
+            ArrayList<Piece> clonedPieces = (ArrayList<Piece>) pieces.clone();
+            solveArow(clonedPieces, rowResult);
             if (!solvable) {
                 break;
             }
         }
-    }
-
-    private Piece getLastPieceInThisRow(ArrayList<ArrayList<Piece>> solutionBoard) throws IllegalArgumentException {
-        if (solutionBoard.isEmpty()) {
-            throw new IllegalArgumentException("your board is empty");
-        }
-        int currentRow = solutionBoard.size() - 1;
-        Piece lastOne = solutionBoard.get(currentRow).get(solutionBoard.get(currentRow).size() - 1);
-
-        return lastOne;
     }
 
     private int calculateWidth(ArrayList<Piece> pieces) {
@@ -57,27 +50,25 @@ public class Puzzle {
         return (int) pieces.stream().filter(p -> p.getLeft() == EdgeType.STRAIGHT).count();
     }
 
-    // TODO: needs refactoring
-    private EdgeType getExpectedEdgeType(ArrayList<ArrayList<Piece>> solutionBoard, Direction direction) {
-        int upperRowIndex = solutionBoard.size() - 2;
-        int currentRowIndex = solutionBoard.size() - 1;
+    private EdgeType getExpectedEdgeType(ArrayList<ArrayList<Piece>> solutionBoard, ArrayList<Piece> result,
+            Direction direction) {
+        int upperRowIndex = solutionBoard.size() - 1;
         int upperPieceIndex = 0;
         int edgeValue = 0;
         if (direction == Direction.UP) {
             if (upperRowIndex < 0) {
                 return EdgeType.STRAIGHT;
-            } else if (solutionBoard.get(currentRowIndex).size() != 0
-                    && solutionBoard.get(currentRowIndex).size() != width) {
-                upperPieceIndex = solutionBoard.get(currentRowIndex).indexOf(getLastPieceInThisRow(solutionBoard)) + 1;
+            } else if (result.size() != width) {
+                upperPieceIndex = result.size();
             }
 
             edgeValue = solutionBoard.get(upperRowIndex).get(upperPieceIndex).getDown().value * -1;
 
         } else { // if (direction == Direction.LEFT)
-            if (solutionBoard.isEmpty() || currentRowIndex < 0) {
+            if (result.isEmpty()) {
                 return EdgeType.STRAIGHT;
             }
-            edgeValue = solutionBoard.get(currentRowIndex).get(solutionBoard.get(currentRowIndex).size() - 1)
+            edgeValue = result.get(result.size() - 1)
                     .getRight().value * -1;
         }
 
@@ -87,54 +78,79 @@ public class Puzzle {
             return EdgeType.OUTWARD;
     }
 
-    // TODO: needs refactoring
     private void solveArow(ArrayList<Piece> pieces, ArrayList<Piece> result) {
-        ArrayList<Piece> rowCandidates = new ArrayList<>();
-        ArrayList<Piece> secondRowCandidates = new ArrayList<>();
+        ArrayList<Piece> rowCandidatesA = new ArrayList<>();
+        ArrayList<Piece> rowCandidatesB = new ArrayList<>();
         int initialPieces = pieces.size();
 
         for (Piece piece : pieces) {
-            if (piece.getTop() == getExpectedEdgeType(solutionBoard, Direction.UP)) {
-                rowCandidates.add(piece);
+            if (piece.getTop() == getExpectedEdgeType(solutionBoard, result, Direction.UP)) {
+                rowCandidatesA.add(piece);
             }
         }
 
-        for (Piece piece : rowCandidates) {
+        for (Piece piece : rowCandidatesA) {
             pieces.remove(piece);
-            if (piece.getLeft() == getExpectedEdgeType(solutionBoard, Direction.LEFT)) {
-                secondRowCandidates.add(piece);
+            if (piece.getLeft() == getExpectedEdgeType(solutionBoard, result, Direction.LEFT)) {
+                rowCandidatesB.add(piece);
             } else {
                 pieces.add(piece);
             }
         }
 
-        for (Piece piece : secondRowCandidates)
-            rowCandidates.remove(piece);
-
-        result.add(secondRowCandidates.get(0));
-        solutionBoard.add(result);
-        secondRowCandidates.remove(0);
-        for (Piece piece : secondRowCandidates) {
-            pieces.add(piece);
+        for (Piece piece : rowCandidatesB) {
+            rowCandidatesA.remove(piece);
         }
-        if (pieces.size() > 0 && pieces.size() < initialPieces) {
-            solveArow(pieces, result);
-        } else if (pieces.size() > 0 && pieces.size() == initialPieces) {
-            if (result.size() > 0) {
-                pieces.add(result.get(result.size() - 1));
-                result.remove(result.get(result.size() - 1));
-                solutionBoard.get(solutionBoard.size() - 1).remove(getLastPieceInThisRow(solutionBoard));
-                solveArow(pieces, result);
-            } else {
-                solvable = false;
-            }
+
+        if (rowCandidatesB.size() > 0) {
+            result.add(rowCandidatesB.get(0));
+            rowCandidatesB.remove(0);
+
+        }
+        for (Piece piece : rowCandidatesB) {
+            pieces.add(piece);
         }
 
         if (result.size() == width) {
             solvable = true;
-        } else
-            solvable = false;
 
+            // checks if all the lower side of last row has straight edge type
+            if (solutionBoard.size() + 1 == height) {
+                for (Piece piece : result) {
+                    if (!piece.getDown().equals(EdgeType.STRAIGHT)) {
+                        solvable = false;
+                        break;
+                    }
+                }
+            }
+
+            // checks if the right side of last piece in the row is straight
+            if (!result.get(result.size() - 1).getRight().equals(EdgeType.STRAIGHT)) {
+                solvable = false;
+            }
+
+            if (solvable) {
+                solutionBoard.add(result);
+            }
+
+        } else if (pieces.size() > 0 && pieces.size() < initialPieces) {
+            solveArow(pieces, result);
+        } else if (!pieces.isEmpty() && pieces.size() == initialPieces) {
+            Piece unfittingPiece = result.get(result.size() - 1);
+            if (!result.isEmpty() && !usedPieces.contains(unfittingPiece)) {
+                usedPieces.add(unfittingPiece);
+                pieces.add(unfittingPiece);
+                result.remove(unfittingPiece);
+                solveArow(pieces, result);
+
+            } else {
+                solvable = false;
+            }
+        } else {
+            solvable = false;
+        }
+
+        usedPieces.clear();
     }
 
     public boolean isSolvable() {
