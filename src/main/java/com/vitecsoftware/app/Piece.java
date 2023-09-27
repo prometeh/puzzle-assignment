@@ -77,5 +77,4 @@ public class Piece {
 
         return result;
     }
-
 }

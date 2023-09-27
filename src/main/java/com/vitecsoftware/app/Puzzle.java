@@ -1,19 +1,23 @@
 package com.vitecsoftware.app;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.stream.Collectors;
 
 public class Puzzle {
     private ArrayList<ArrayList<Piece>> solutionBoard;
-    private ArrayList<Piece> usedPieces = new ArrayList<>();
+    private ArrayList<Piece> usedPieces;
     private ArrayList<Piece> pieces;
+    private ArrayList<Piece> untouchedPieces;
     private int width;
     private int height;
     private int totalPieces;
     private boolean solvable;
-    private int solutionsNumber;
 
     public Puzzle(String[] data) {
         this.pieces = getPieces(data);
+        this.untouchedPieces = getPieces(data);
+        this.usedPieces = new ArrayList<>();
         this.solutionBoard = new ArrayList<>();
         this.width = calculateWidth(pieces);
         this.height = calculateHeight(pieces);
@@ -34,8 +38,7 @@ public class Puzzle {
 
         for (int i = 0; i < height; i++) {
             ArrayList<Piece> rowResult = new ArrayList<>();
-            ArrayList<Piece> clonedPieces = (ArrayList<Piece>) pieces.clone();
-            solveArow(clonedPieces, rowResult);
+            solveRow(pieces, rowResult);
             if (!solvable) {
                 break;
             }
@@ -78,7 +81,7 @@ public class Puzzle {
             return EdgeType.OUTWARD;
     }
 
-    private void solveArow(ArrayList<Piece> pieces, ArrayList<Piece> result) {
+    private void solveRow(ArrayList<Piece> pieces, ArrayList<Piece> result) {
         ArrayList<Piece> rowCandidatesA = new ArrayList<>();
         ArrayList<Piece> rowCandidatesB = new ArrayList<>();
         int initialPieces = pieces.size();
@@ -102,14 +105,12 @@ public class Puzzle {
             rowCandidatesA.remove(piece);
         }
 
-        if (rowCandidatesB.size() > 0) {
+        if (!rowCandidatesB.isEmpty()) {
             result.add(rowCandidatesB.get(0));
             rowCandidatesB.remove(0);
 
         }
-        for (Piece piece : rowCandidatesB) {
-            pieces.add(piece);
-        }
+        pieces.addAll(rowCandidatesB);
 
         if (result.size() == width) {
             solvable = true;
@@ -133,15 +134,15 @@ public class Puzzle {
                 solutionBoard.add(result);
             }
 
-        } else if (pieces.size() > 0 && pieces.size() < initialPieces) {
-            solveArow(pieces, result);
+        } else if (!pieces.isEmpty() && pieces.size() < initialPieces) {
+            solveRow(pieces, result);
         } else if (!pieces.isEmpty() && pieces.size() == initialPieces) {
             Piece unfittingPiece = result.get(result.size() - 1);
             if (!result.isEmpty() && !usedPieces.contains(unfittingPiece)) {
                 usedPieces.add(unfittingPiece);
                 pieces.add(unfittingPiece);
                 result.remove(unfittingPiece);
-                solveArow(pieces, result);
+                solveRow(pieces, result);
 
             } else {
                 solvable = false;
@@ -156,6 +157,38 @@ public class Puzzle {
     public boolean isSolvable() {
         trySolvePuzzle();
         return solvable;
+    }
+
+    private int getFactorial(int n) {
+        if (n <= 1) {
+            return 1;
+        } else {
+            return n * getFactorial(n - 1);
+        }
+    }
+
+    public int getSolutionsNumber() {
+        int noOfSolutions = 0;
+
+        if (solvable) {
+            for (String pieceName : untouchedPieces.stream().map(Piece::getName).distinct()
+                    .toList()) {
+                int frequency = Collections.frequency(
+                        untouchedPieces.stream().map(Piece::getName).collect(Collectors.toList()), pieceName);
+                if (frequency > 1) {
+                    noOfSolutions += getFactorial(frequency);
+                }
+            }
+            System.out.println();
+
+            if (noOfSolutions == 0) {
+                return 1;
+            } else {
+                return noOfSolutions;
+            }
+        } else {
+            return noOfSolutions;
+        }
     }
 
 }
